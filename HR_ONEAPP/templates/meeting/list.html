@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Meetings - HR ONEAPP{% endblock %}
+{% block page_title %}Meetings{% endblock %}
+{% block breadcrumb %}<p class="crumb">Scheduled and live meetings</p>{% endblock %}
+{% block content %}
+<div class="two-col">
+  <div>
+    {% if session.user_role == 'admin' %}
+    <div style="margin-bottom:1rem;">
+      <a href="{{ url_for('meeting.start') }}" class="btn btn-primary">+ Start New Meeting</a>
+    </div>
+    {% endif %}
+
+    {% if meetings %}
+    <div class="card">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Title</th><th>Started By</th><th>Started At</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for m in meetings %}
+      <tr>
+        <td><strong>{{ m.title }}</strong>{% if m.is_recurring %} <span class="badge-pill badge-blue">🔁 {{ m.recurrence }}</span>{% endif %}
+          <br/><small style="color:var(--text-faint);">{{ m.description or '' }}</small></td>
+        <td>{{ m.starter.name }}</td>
+        <td>
+          {% if m.status == 'scheduled' %}
+            🗓 Scheduled for {{ m.scheduled_date.strftime('%d %b %Y') }}
+          {% else %}
+            {{ m.started_at.strftime('%d %b %Y %I:%M %p') }}
+          {% endif %}
+        </td>
+        <td><span class="badge-pill {{ 'badge-green' if m.status=='active' else ('badge-blue' if m.status=='scheduled' else 'badge-gray') }}">{{ m.status | capitalize }}</span></td>
+        <td>
+          {% if m.status == 'active' %}
+            {% if session.user_role == 'admin' %}
+              <a href="{{ url_for('meeting.manage', meeting_id=m.id) }}" class="btn btn-sm btn-primary">Manage</a>
+              <form method="POST" action="{{ url_for('meeting.end_meeting', meeting_id=m.id) }}" style="display:inline" onsubmit="return confirm('End for everyone?')">
+                <button class="btn btn-sm btn-danger">End</button>
+              </form>
+            {% else %}
+              <a href="{{ url_for('meeting.join', meeting_id=m.id) }}" class="btn btn-sm btn-success">Join</a>
+            {% endif %}
+          {% elif m.status == 'scheduled' %}
+            {% if session.user_role == 'admin' %}
+              <form method="POST" action="{{ url_for('meeting.cancel_scheduled', meeting_id=m.id) }}" style="display:inline" onsubmit="return confirm('Cancel this scheduled meeting?')">
+                <button class="btn btn-sm btn-outline">Cancel</button>
+              </form>
+              <span style="color:var(--text-faint);font-size:.8rem;">Auto-starts on the date</span>
+            {% endif %}
+          {% else %}
+            {% if session.user_role == 'admin' %}<a href="{{ url_for('meeting.manage', meeting_id=m.id) }}" class="btn btn-sm btn-outline">View</a>{% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    </div>
+    {% else %}
+    <div class="empty-card"><p>No meetings yet.</p></div>
+    {% endif %}
+  </div>
+
+  <div class="cal-wrap" id="meeting-cal"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  initCalendar('meeting-cal', '{{ url_for("meeting.calendar_feed") }}', {title: 'Meeting Calendar'});
+</script>
+{% endblock %}

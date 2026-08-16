@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Manage Meeting - HR ONEAPP{% endblock %}
+{% block page_title %}Manage Meeting{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+  <h2>{{ meeting.title }}</h2>
+  <span class="badge-pill {{ 'badge-green' if meeting.status=='active' else ('badge-blue' if meeting.status=='scheduled' else 'badge-gray') }}">{{ meeting.status }}</span>
+</div>
+
+{% if meeting.status == 'scheduled' %}
+<div class="card">
+  <h3 style="margin-bottom:.5rem;">🗓 Fixed for {{ meeting.scheduled_date.strftime('%d %b %Y') }}</h3>
+  <p class="subtitle" style="margin-bottom:1.2rem;">
+    This meeting hasn't started yet. No notifications have gone out, and there's nothing to manage
+    until it goes live — everyone will be alerted automatically on the date above.
+  </p>
+  <form method="POST" action="{{ url_for('meeting.cancel_scheduled', meeting_id=meeting.id) }}"
+        onsubmit="return confirm('Cancel this scheduled meeting?')">
+    <button class="btn btn-sm btn-danger">Cancel Scheduled Meeting</button>
+  </form>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-header">
+    <div><h3>Mark Attendance</h3><p class="subtitle">Check all employees who are present in the meeting</p></div>
+  </div>
+  <form method="POST" action="{{ url_for('meeting.mark_attendance', meeting_id=meeting.id) }}">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Employee</th><th>Role</th><th>Joined At</th><th>Present?</th></tr></thead>
+      <tbody>
+      {% for p in participants %}
+      <tr>
+        <td>{{ p.user.name }}</td>
+        <td>{{ p.user.role | capitalize }}</td>
+        <td>{{ p.joined_at.strftime('%I:%M %p') if p.joined_at else '—' }}</td>
+        <td><input type="checkbox" name="present" value="{{ p.user_id }}" {{ 'checked' if p.attendance == 'present' }}/></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="empty-state">No participants yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div style="margin-top:1rem;display:flex;gap:1rem;">
+      <button type="submit" class="btn btn-primary">✅ Save Attendance</button>
+      <a href="{{ url_for('meeting.list_meetings') }}" class="btn btn-outline">Back</a>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

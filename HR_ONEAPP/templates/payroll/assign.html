@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Assign Salary - HR ONEAPP{% endblock %}
+{% block page_title %}Assign Salary{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px;">
+  <h3 style="margin-bottom:1.5rem;">💰 Assign Salary</h3>
+  <form method="POST">
+    <div class="form-group"><label>Employee *</label>
+      <select name="employee_id" required>
+        <option value="">-- Select Employee --</option>
+        {% for emp, user in employees %}
+        <option value="{{ emp.id }}">{{ user.name }} ({{ emp.employee_code }})</option>
+        {% endfor %}
+      </select></div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label>Month *</label>
+        <select name="month" required>
+          {% for m in months %}
+          <option value="{{ m }}" {{ 'selected' if m==current_month }}>{{ m }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="form-group"><label>Year *</label>
+        <input type="number" name="year" value="{{ current_year }}" required/></div>
+    </div>
+    <div class="form-row cols-3">
+      <div class="form-group"><label>Basic Salary (₹)</label><input type="number" name="basic_salary" step="0.01" placeholder="0.00"/></div>
+      <div class="form-group"><label>Allowances (₹)</label><input type="number" name="allowances" step="0.01" placeholder="0.00"/></div>
+      <div class="form-group"><label>Deductions (₹)</label><input type="number" name="deductions" step="0.01" placeholder="0.00"/></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label>Salary Release Date</label><input type="date" name="pay_date"/></div>
+      <div class="form-group"><label>Tax Submission Date</label><input type="date" name="tax_due_date"/></div>
+    </div>
+    <div style="display:flex;gap:1rem;margin-top:1rem;">
+      <button type="submit" class="btn btn-primary">Assign Salary</button>
+      <a href="{{ url_for('payroll.index') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

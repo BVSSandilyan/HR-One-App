@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Confirm Approval - HR ONEAPP{% endblock %}
+{% block page_title %}Confirm Leave Approval{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:560px;">
+  <h3 style="margin-bottom:.3rem;">{{ lr.employee.user.name if lr.employee and lr.employee.user else 'Employee' }}</h3>
+  <p class="subtitle" style="margin-bottom:1.2rem;">
+    {{ lr.leave_type | capitalize }} leave · {{ lr.from_date.strftime('%d %b %Y') }}
+    {% if lr.to_date != lr.from_date %} – {{ lr.to_date.strftime('%d %b %Y') }}{% endif %}
+  </p>
+
+  <div class="detail-grid" style="margin-bottom:1.2rem;">
+    <div><label>Days requested</label><p>{{ preview.days }}</p></div>
+    <div><label>Current balance</label><p>{{ emp.leave_balance if emp and emp.leave_balance is not none else 20.0 }} days</p></div>
+    <div><label>Balance after approval</label><p>{{ preview.balance_after }} days</p></div>
+  </div>
+
+  {% if preview.needs_rate %}
+  <div class="info-box" style="border-color:var(--danger);background:var(--danger-soft,#fee2e2);color:var(--danger,#dc2626);">
+    ⚠️ This request exceeds the employee's remaining balance by
+    <strong>{{ '%.1f' | format(preview.excess_days) }} day(s)</strong>.
+    Enter a per-day deduction rate (₹200–500) to apply against their salary for the excess.
+  </div>
+  <form method="POST">
+    <div class="form-group">
+      <label>Deduction rate per excess day (₹) *</label>
+      <input type="number" name="deduction_rate" min="200" max="500" step="1" required
+             placeholder="e.g. 300"/>
+      <p style="font-size:.78rem;color:var(--text-faint);margin-top:.3rem;">
+        Total deduction: {{ '%.1f' | format(preview.excess_days) }} day(s) × rate —
+        will be added to {{ lr.from_date.strftime('%B %Y') }}'s payroll for this employee.
+      </p>
+    </div>
+    <div style="display:flex;gap:1rem;margin-top:1.2rem;">
+      <button type="submit" class="btn btn-primary">Approve with Deduction</button>
+      <a href="{{ url_for('leave.index') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+  {% else %}
+  <div class="info-box">
+    ✅ This request is within the employee's available balance — no deduction needed.
+  </div>
+  <form method="POST">
+    <div style="display:flex;gap:1rem;margin-top:1rem;">
+      <button type="submit" class="btn btn-primary">Confirm Approval</button>
+      <a href="{{ url_for('leave.index') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

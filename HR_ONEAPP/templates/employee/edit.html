@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Edit Employee - HR ONEAPP{% endblock %}
+{% block page_title %}Edit Employee{% endblock %}
+{% block content %}
+<div class="card" style="max-width:620px;">
+  <h3 style="margin-bottom:1.5rem;">Edit: {{ user.name }}</h3>
+  <form method="POST">
+    <div class="form-row cols-2">
+      <div class="form-group"><label>Designation</label><input type="text" name="designation" value="{{ emp.designation or '' }}" placeholder="e.g. Software Engineer"/></div>
+      <div class="form-group"><label>Phone</label><input type="text" name="phone" value="{{ emp.phone or '' }}" placeholder="+91 99999 99999"/></div>
+    </div>
+    <div class="form-group"><label>Department</label>
+      <select name="department_id">
+        <option value="">-- None --</option>
+        {% for d in depts %}<option value="{{ d.id }}" {{ 'selected' if emp.department_id == d.id }}>{{ d.name }}</option>{% endfor %}
+      </select></div>
+    <div class="form-row cols-3">
+      <div class="form-group"><label>Date of Birth</label><input type="date" name="date_of_birth" value="{{ emp.date_of_birth or '' }}"/></div>
+      <div class="form-group"><label>Probation Ends</label><input type="date" name="probation_end" value="{{ emp.probation_end or '' }}"/></div>
+      <div class="form-group"><label>Contract Renewal</label><input type="date" name="contract_end" value="{{ emp.contract_end or '' }}"/></div>
+    </div>
+    <div class="form-group"><label>Address</label><textarea name="address" rows="2">{{ emp.address or '' }}</textarea></div>
+    <div style="display:flex;gap:1rem;margin-top:1rem;">
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+      <a href="{{ url_for('employee.detail', emp_id=emp.id) }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

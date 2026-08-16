@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Apply for Leave - HR ONEAPP{% endblock %}
+{% block page_title %}Apply for Leave{% endblock %}
+{% block breadcrumb %}<p class="crumb">Leave Requests › Apply</p>{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:560px;">
+  <h3 style="margin-bottom:.4rem;">🗓 New Leave Request</h3>
+  <p class="subtitle" style="margin-bottom:1.2rem;">
+    You have <strong>{{ '%.1f'|format(balance) }} day(s)</strong> remaining out of your 20-day annual balance.
+    Requesting more than this is allowed, but the excess will be deducted from your salary.
+  </p>
+  <form method="POST">
+    <div class="form-group">
+      <label>Leave Type *</label>
+      <select name="leave_type" id="leave-type" required onchange="onLeaveTypeChange()">
+        <option value="">-- Select --</option>
+        <option value="sick">Sick Leave</option>
+        <option value="casual">Casual Leave</option>
+        <option value="earned">Earned Leave</option>
+        <option value="half-day">Half Day</option>
+      </select>
+    </div>
+    {% if join_date %}
+    <div class="info-box" style="margin-bottom:1rem;">
+      ℹ️ You can request leave for any date from your joining date onward ({{ join_date }}).
+    </div>
+    {% endif %}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" id="date-range-row">
+      <div class="form-group">
+        <label id="from-date-label">From Date *</label>
+        <input type="date" name="from_date" id="from-date" required onchange="syncToDate()"
+               {% if join_date %}min="{{ join_date }}"{% endif %}/>
+      </div>
+      <div class="form-group" id="to-date-group">
+        <label>To Date *</label>
+        <input type="date" name="to_date" id="to-date" required
+               {% if join_date %}min="{{ join_date }}"{% endif %}/>
+      </div>
+    </div>
+    <div class="info-box" id="half-day-note" style="display:none;">
+      ℹ️ Half day leave applies to a single date only.
+    </div>
+    <div class="form-group">
+      <label>Reason</label>
+      <textarea name="reason" rows="3" placeholder="Briefly describe the reason for leave..."></textarea>
+    </div>
+    <div class="info-box">ℹ️ Your request will be sent to the admin for approval. You'll be notified once it's reviewed.</div>
+    <div style="display:flex;gap:1rem;margin-top:1.2rem;">
+      <button type="submit" class="btn btn-primary">Submit Request</button>
+      <a href="{{ url_for('leave.index') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  /* Half-day leave is inherently single-date. When selected, hide the
+     "To Date" input and keep its value mirrored to "From Date" so the
+     form still submits a valid (from_date == to_date) pair without any
+     backend schema change — the server already loops from_date..to_date
+     once for a single-day range. */
+  function onLeaveTypeChange(){
+    const type = document.getElementById('leave-type').value;
+    const toGroup = document.getElementById('to-date-group');
+    const fromLabel = document.getElementById('from-date-label');
+    const note = document.getElementById('half-day-note');
+    const isHalfDay = type === 'half-day';
+
+    toGroup.style.display = isHalfDay ? 'none' : 'block';
+    note.style.display = isHalfDay ? 'block' : 'none';
+    fromLabel.textContent = isHalfDay ? 'Date *' : 'From Date *';
+
+    if (isHalfDay) syncToDate();
+  }
+
+  const JOIN_DATE_FLOOR = {{ ('"' + join_date + '"') if join_date else 'null' }};
+
+  /* Whenever From Date changes: for half-day, mirror it straight into To
+     Date as before. For every other type, push To Date's min up to the
+     chosen From Date — a To Date earlier than From Date never made sense
+     anyway, so the browser should stop offering those days at all rather
+     than letting the person pick one and only finding out it's invalid
+     after submitting. The floor never drops below the joining-date floor
+     itself (JOIN_DATE_FLOOR) even if From Date is somehow cleared. If the
+     already-chosen To Date is now earlier than the new min, it's cleared
+     so a stale, now-invalid value can't silently ride along to submit. */
+  function syncToDate(){
+    const type = document.getElementById('leave-type').value;
+    const fromInput = document.getElementById('from-date');
+    const toInput   = document.getElementById('to-date');
+
+    if (type === 'half-day'){
+      toInput.value = fromInput.value;
+      return;
+    }
+
+    const effectiveMin = fromInput.value || JOIN_DATE_FLOOR;
+    if (effectiveMin){
+      toInput.min = effectiveMin;
+      if (toInput.value && toInput.value < effectiveMin){
+        toInput.value = '';
+      }
+    }
+  }
+</script>
+{% endblock %}

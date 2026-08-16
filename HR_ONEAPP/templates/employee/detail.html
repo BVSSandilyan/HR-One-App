@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ user.name }} - HR ONEAPP{% endblock %}
+{% block page_title %}Employee Profile{% endblock %}
+{% block content %}
+<div class="card" style="max-width:620px;">
+  <div style="display:flex;align-items:center;gap:1.5rem;margin-bottom:2rem;">
+    <div class="big-avatar">{{ user.name[0]|upper }}</div>
+    <div>
+      <h2>{{ user.name }}</h2>
+      <p style="color:var(--text-muted);">{{ emp.designation or 'No designation' }} · {{ user.role|capitalize }}</p>
+      <p style="color:var(--text-muted);">{{ user.email }}</p>
+    </div>
+  </div>
+  <div class="detail-grid">
+    <div><label>Employee Code</label><p>{{ emp.employee_code }}</p></div>
+    <div><label>Phone</label><p>{{ emp.phone or '—' }}</p></div>
+    <div><label>Date of Joining</label><p>{{ emp.date_of_joining or '—' }}</p></div>
+    <div><label>Date of Birth</label><p>{{ emp.date_of_birth or '—' }}</p></div>
+    <div><label>Probation Ends</label><p>{{ emp.probation_end or '—' }}</p></div>
+    <div><label>Contract Renewal</label><p>{{ emp.contract_end or '—' }}</p></div>
+    <div><label>Salary</label><p>{% if emp.salary %}₹{{ '%.2f'|format(emp.salary) }}{% else %}—{% endif %}</p></div>
+    <div><label>Leave Balance</label><p>{{ '%.1f'|format(emp.leave_balance if emp.leave_balance is not none else 20.0) }} / 20 days</p></div>
+    <div><label>Address</label><p>{{ emp.address or '—' }}</p></div>
+  </div>
+  {% if session.user_role in ['admin','hr'] %}
+  <a href="{{ url_for('employee.edit', emp_id=emp.id) }}" class="btn btn-primary" style="margin-top:1.5rem;">Edit Profile</a>
+  {% endif %}
+</div>
+{% endblock %}

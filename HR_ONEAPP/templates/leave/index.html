@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Leave Requests - HR ONEAPP{% endblock %}
+{% block page_title %}Leave Requests{% endblock %}
+{% block breadcrumb %}<p class="crumb">{{ 'Review and approve employee leave requests' if role == 'admin' else 'Your leave history' }}</p>{% endblock %}
+
+{% block content %}
+<div class="two-col">
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3>{{ 'All Requests' if role == 'admin' else 'My Requests' }}</h3>
+          {% if role == 'admin' and pending_count %}
+          <p class="subtitle">{{ pending_count }} pending review</p>
+          {% endif %}
+        </div>
+        <a href="{{ url_for('leave.apply') }}" class="btn btn-sm btn-primary">+ Apply for Leave</a>
+      </div>
+
+      <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            {% if role == 'admin' %}<th>Employee</th><th>Balance</th>{% endif %}
+            <th>Type</th><th>From</th><th>To</th><th>Reason</th><th>Status</th>
+            {% if role == 'admin' %}<th>Action</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+        {% for lr, emp, user in records %}
+        <tr>
+          {% if role == 'admin' %}
+          <td>{{ user.name }}<br/><small style="color:var(--text-faint);">{{ emp.employee_code }}</small></td>
+          <td>{{ '%.1f'|format(emp.leave_balance if emp.leave_balance is not none else 20.0) }}d</td>
+          {% endif %}
+          <td>{{ lr.leave_type | capitalize }}</td>
+          <td>{{ lr.from_date.strftime('%d %b %Y') }}</td>
+          <td>{{ lr.to_date.strftime('%d %b %Y') }}</td>
+          <td>{{ lr.reason or '—' }}</td>
+          <td>
+            <span class="badge-pill {{ 'badge-green' if lr.status=='approved' else ('badge-red' if lr.status=='rejected' else 'badge-orange') }}">
+              {{ lr.status | capitalize }}
+            </span>
+          </td>
+          {% if role == 'admin' %}
+          <td>
+            {% if lr.status == 'pending' %}
+            <a href="{{ url_for('leave.approve', leave_id=lr.id) }}" class="btn btn-sm btn-success">Approve</a>
+            <form method="POST" action="{{ url_for('leave.decline', leave_id=lr.id) }}" style="display:inline">
+              <button class="btn btn-sm btn-danger">Decline</button>
+            </form>
+            {% else %}
+            <span style="color:var(--text-faint);font-size:.8rem;">Reviewed</span>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 8 if role == 'admin' else 5 }}" class="empty-state">No leave requests yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% include "_pagination.html" %}
+    </div>
+  </div>
+
+  <div class="cal-wrap" id="leave-cal"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  initCalendar('leave-cal', '{{ url_for("leave.calendar_feed") }}', {title: 'Leave Calendar'});
+</script>
+{% endblock %}

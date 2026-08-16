@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Payroll - HR ONEAPP{% endblock %}
+{% block page_title %}Payroll{% endblock %}
+{% block breadcrumb %}<p class="crumb">Salary records and schedules</p>{% endblock %}
+{% block content %}
+<div class="two-col">
+  <div>
+    <div style="margin-bottom:1rem;">
+      <a href="{{ url_for('payroll.assign') }}" class="btn btn-primary">+ Assign Salary</a>
+    </div>
+    <div class="card">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Employee</th><th>Month/Year</th><th>Basic</th><th>Allowances</th><th>Deductions</th><th>Net Salary</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for p, emp, user in records %}
+      <tr>
+        <td>{{ user.name }}<br/><small style="color:var(--text-faint);">{{ emp.employee_code }}</small></td>
+        <td>{{ '%02d'|format(p.month) }}/{{ p.year }}</td>
+        <td>₹{{ '%.2f'|format(p.basic_salary) }}</td>
+        <td>₹{{ '%.2f'|format(p.allowances) }}</td>
+        <td>₹{{ '%.2f'|format(p.deductions) }}</td>
+        <td><strong>₹{{ '%.2f'|format(p.net_salary) }}</strong></td>
+        <td><span class="badge-pill {{ 'badge-green' if p.status=='paid' else 'badge-orange' }}">{{ p.status | capitalize }}</span></td>
+        <td>
+          {% if p.status == 'pending' %}
+          <form method="POST" action="{{ url_for('payroll.mark_paid', payroll_id=p.id) }}" style="display:inline">
+            <button class="btn btn-sm btn-success">Mark Paid</button>
+          </form>
+          {% else %}<span style="color:var(--text-faint);">Paid</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="empty-state">No payroll records yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% include "_pagination.html" %}
+    </div>
+  </div>
+
+  <div class="cal-wrap" id="payroll-cal"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  initCalendar('payroll-cal', '{{ url_for("payroll.calendar_feed") }}', {title: 'Payroll Calendar'});
+</script>
+{% endblock %}

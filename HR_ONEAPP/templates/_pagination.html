@@ -1,0 +1,11 @@
+{% if pagination and pagination.pages > 1 %}
+<div class="pagination">
+  {% set args = request.args.to_dict() %}
+  {% set _ = args.pop('page', None) %}
+  <a href="{{ url_for(request.endpoint, page=pagination.prev_num, **args) }}"
+     class="page-btn {{ 'disabled' if not pagination.has_prev }}">‹ Prev</a>
+  <span class="page-info">Page {{ pagination.page }} of {{ pagination.pages }} · {{ pagination.total }} total</span>
+  <a href="{{ url_for(request.endpoint, page=pagination.next_num, **args) }}"
+     class="page-btn {{ 'disabled' if not pagination.has_next }}">Next ›</a>
+</div>
+{% endif %}

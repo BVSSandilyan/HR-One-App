@@ -1,0 +1,700 @@
+{% extends "base.html" %}
+{% block title %}{{ meeting.title }} — Meeting Room{% endblock %}
+{% block page_title %}{{ meeting.title }}{% endblock %}
+{% block breadcrumb %}<p class="crumb">Meetings › Room</p>{% endblock %}
+
+{% block content %}
+<div class="room-shell fade-in">
+
+  <div class="room-topbar">
+    <div style="display:flex;align-items:center;gap:.75rem;">
+      <span class="live-dot"></span>
+      <div>
+        <strong style="color:#fff;">{{ meeting.title }}</strong>
+        <p style="font-size:.75rem;color:rgba(255,255,255,.55);">Started by {{ meeting.starter.name }}</p>
+      </div>
+    </div>
+    <div id="room-timer" style="font-size:1rem;font-weight:700;color:#a5b4fc;font-variant-numeric:tabular-nums;">00:00:00</div>
+    <div style="display:flex;gap:.5rem;">
+      {% if session.user_role == 'admin' %}
+      <a href="{{ url_for('meeting.manage', meeting_id=meeting.id) }}" class="btn btn-ghost btn-sm" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2);">📋 Manage</a>
+      <form method="POST" action="{{ url_for('meeting.end_meeting', meeting_id=meeting.id) }}" style="display:inline" onsubmit="return confirm('End for everyone?')">
+        <button class="btn btn-danger btn-sm">⏹ End</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Exactly ONE self-tile. Never re-created. -->
+  <div class="video-grid" id="video-grid">
+    <div class="video-tile self-tile" id="self-tile">
+      <video id="self-video" autoplay muted playsinline style="display:none;width:100%;height:100%;object-fit:cover;"></video>
+      <div class="tile-avatar" id="self-ph">
+        <div class="big-avatar-circle">{{ session.user_name[0]|upper }}</div>
+      </div>
+      <div class="tile-label">
+        <span>{{ session.user_name }} (You)</span>
+        <span style="display:flex;gap:.3rem;">
+          <span id="self-mic-i">🔇</span>
+          <span id="self-cam-i">📵</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="side-panel" id="side-panel" style="display:none;">
+    <div class="panel-hdr">
+      <span style="font-weight:700;font-size:.9rem;">Participants ({{ participants|length }})</span>
+      <button onclick="closePanel()" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,.6);font-size:1.1rem;">✕</button>
+    </div>
+    <ul style="list-style:none;overflow-y:auto;flex:1;">
+      {% for p in participants %}
+      <li id="p-{{ p.user_id }}" style="display:flex;align-items:center;gap:.65rem;padding:.65rem 1rem;border-bottom:1px solid rgba(255,255,255,.06);">
+        <div class="p-av">{{ p.user.name[0]|upper }}</div>
+        <div style="flex:1;">
+          <p style="font-size:.85rem;color:#e2e8f0;font-weight:500;">
+            {{ p.user.name }}{% if p.user_id==session.user_id %} <em style="opacity:.5;">(You)</em>{% endif %}
+          </p>
+          <p style="font-size:.72rem;color:rgba(255,255,255,.4);">{{ p.user.role|capitalize }}</p>
+        </div>
+        <span id="pm-{{ p.user_id }}" style="opacity:.4;font-size:.9rem;">🔇</span>
+        <span id="pc-{{ p.user_id }}" style="opacity:.4;font-size:.9rem;">📵</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="controls-bar">
+    <button class="ctrl off" id="btn-mic" onclick="toggleMic()">
+      <span id="mic-icon">🎤</span><span class="clbl" id="lbl-mic">Unmute</span>
+    </button>
+    <button class="ctrl off" id="btn-cam" onclick="toggleCam()">
+      <span id="cam-icon">📷</span><span class="clbl" id="lbl-cam">Camera</span>
+    </button>
+    <button class="ctrl" id="btn-audio" onclick="toggleAudio()">
+      <span id="audio-icon">🔊</span><span class="clbl" id="lbl-audio">Speaker</span>
+    </button>
+    <button class="ctrl" id="btn-screen" onclick="toggleScreen()">
+      <span id="screen-icon">🖥️</span><span class="clbl" id="lbl-screen">Share</span>
+    </button>
+    <button class="ctrl" onclick="togglePanel()">
+      👥<span class="clbl">People ({{ participants|length }})</span>
+    </button>
+    <form method="POST" action="{{ url_for('meeting.leave_room', meeting_id=meeting.id) }}" style="display:inline;" onsubmit="cleanup()">
+      <button type="submit" class="ctrl leave">📞<span class="clbl">Leave</span></button>
+    </form>
+  </div>
+
+</div>
+
+<style>
+.room-shell{display:flex;flex-direction:column;height:calc(100vh - 140px);background:#0c0f1a;border-radius:var(--radius-lg);overflow:hidden;position:relative;}
+.room-topbar{background:#111827;padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;gap:.5rem;}
+.live-dot{width:10px;height:10px;background:#ef4444;border-radius:50%;flex-shrink:0;animation:lpulse 1.5s infinite;}
+@keyframes lpulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.4);}}
+.video-grid{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px;padding:8px;overflow-y:auto;background:#0c0f1a;align-content:start;}
+.video-tile{position:relative;background:#1a1f2e;border-radius:10px;overflow:hidden;aspect-ratio:16/9;border:2px solid transparent;transition:.2s;}
+.video-tile.speaking{border-color:#4f46e5;}
+.tile-avatar{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.big-avatar-circle{width:64px;height:64px;border-radius:50%;background:#4f46e5;display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:700;color:#fff;}
+.tile-label{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;padding:.45rem .65rem;font-size:.78rem;display:flex;justify-content:space-between;align-items:center;}
+.screen-full{grid-column:1/-1;aspect-ratio:16/9;}
+.side-panel{position:absolute;right:8px;top:60px;width:250px;bottom:78px;background:#111827;border:1px solid rgba(255,255,255,.08);border-radius:12px;z-index:50;display:flex;flex-direction:column;box-shadow:0 12px 30px rgba(0,0,0,.5);}
+.panel-hdr{padding:.7rem 1rem;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;}
+.p-av{width:30px;height:30px;border-radius:50%;background:#4f46e5;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0;}
+.controls-bar{display:flex;align-items:center;justify-content:center;gap:8px;padding:.9rem;background:#111827;border-top:1px solid rgba(255,255,255,.06);flex-wrap:wrap;}
+.ctrl{display:flex;flex-direction:column;align-items:center;gap:3px;background:#1f2937;border:none;border-radius:10px;cursor:pointer;padding:.55rem .85rem;min-width:74px;color:#e5e7eb;transition:.15s;}
+.ctrl:hover{background:#2d3748;transform:translateY(-1px);}
+.ctrl.active{background:#4f46e5;color:#fff;}
+.ctrl.off{background:#3a1a1a;color:#fca5a5;}
+.ctrl.off:hover{background:#4a2020;}
+.ctrl.leave{background:#dc2626;color:#fff;}
+.ctrl.leave:hover{background:#b91c1c;}
+.clbl{font-size:.68rem;font-weight:600;white-space:nowrap;}
+</style>
+
+<!-- Socket.IO client — must match server version (5.x) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+'use strict';
+
+const MID   = {{ meeting.id }};
+const UID   = {{ session.user_id }};
+const UNAME = "{{ session.user_name }}";
+
+/* ── ICE / STUN configuration ──
+   Public STUN servers work fine for same-LAN or same-machine peers.
+   For cross-network peers, add TURN server credentials here. */
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' }
+  ]
+};
+
+/* ── Single source of truth for all local media state ── */
+const state = {
+  stream:       null,   // one MediaStream reused for mic + camera
+  screenStream: null,   // separate MediaStream for screen share
+  micOn:        false,
+  camOn:        false,
+  audioOn:      true,   // speaker output (remote audio)
+  screenOn:     false,
+  vadCtx:       null,
+  vadLoop:      null
+};
+
+/* ── Map<socketId → RTCPeerConnection> for every remote peer ── */
+const peers = new Map();
+
+/* ══════════════════════════════════════════════════════
+   TIMER
+   ══════════════════════════════════════════════════════ */
+const MEETING_START = new Date("{{ meeting.started_at.isoformat() }}Z");
+function tick(){
+  const s = Math.floor((Date.now() - MEETING_START) / 1000);
+  document.getElementById('room-timer').textContent =
+    [Math.floor(s/3600), Math.floor((s%3600)/60), s%60]
+      .map(v => String(v).padStart(2,'0')).join(':');
+}
+setInterval(tick, 1000); tick();
+
+/* ══════════════════════════════════════════════════════
+   LOCAL MEDIA  —  getStream() is the single gateway.
+
+   FIX 1: Request audio-only first so mic works even when
+   no camera is available. Camera is added separately.
+   This prevents a camera-permission failure from killing
+   audio as well, which was the root cause of mic
+   dysfunction for users without a webcam.
+   ══════════════════════════════════════════════════════ */
+
+async function getStream() {
+  if (state.stream) return state.stream;
+
+  // Step 1: audio-only (very likely to succeed)
+  let audioStream = null;
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl:  true
+      },
+      video: false
+    });
+  } catch (e) {
+    console.warn('[media] Microphone access denied or unavailable:', e.name);
+  }
+
+  // Step 2: try to add video on top (silently skip if no camera)
+  let videoStream = null;
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  } catch (e) {
+    console.warn('[media] Camera access denied or unavailable:', e.name);
+  }
+
+  // Combine into one MediaStream
+  const tracks = [];
+  if (audioStream) audioStream.getAudioTracks().forEach(t => tracks.push(t));
+  if (videoStream) videoStream.getVideoTracks().forEach(t => tracks.push(t));
+
+  if (tracks.length === 0) {
+    console.warn('[media] No media tracks obtained at all.');
+    return null;
+  }
+
+  state.stream = new MediaStream(tracks);
+
+  // Start with both kinds disabled — user explicitly toggles them on
+  state.stream.getAudioTracks().forEach(t => { t.enabled = false; });
+  state.stream.getVideoTracks().forEach(t => { t.enabled = false; });
+
+  // Wire self-preview video element
+  document.getElementById('self-video').srcObject = state.stream;
+
+  // FIX 2: Add all local tracks to any peer connections that were
+  // created before getStream() was first called (i.e., when we joined
+  // a room that already had participants and peer connections were set
+  // up in existing_peers before the user clicked mic/cam).
+  peers.forEach(pc => _addLocalTracksToPeer(pc));
+
+  return state.stream;
+}
+
+/* ══════════════════════════════════════════════════════
+   MIC TOGGLE
+   ══════════════════════════════════════════════════════ */
+async function toggleMic() {
+  await getStream();
+  state.micOn = !state.micOn;
+
+  if (state.stream) {
+    state.stream.getAudioTracks().forEach(t => { t.enabled = state.micOn; });
+  }
+
+  const btn  = document.getElementById('btn-mic');
+  document.getElementById('mic-icon').textContent   = state.micOn ? '🎤' : '🔇';
+  document.getElementById('lbl-mic').textContent    = state.micOn ? 'Mute'   : 'Unmute';
+  document.getElementById('self-mic-i').textContent = state.micOn ? '🎤' : '🔇';
+  btn.className = 'ctrl ' + (state.micOn ? 'active' : 'off');
+
+  if (state.micOn) _startVAD(); else _stopVAD();
+  broadcastState();
+}
+
+/* ══════════════════════════════════════════════════════
+   CAMERA TOGGLE
+   ══════════════════════════════════════════════════════ */
+async function toggleCam() {
+  await getStream();
+  state.camOn = !state.camOn;
+
+  if (state.stream) {
+    state.stream.getVideoTracks().forEach(t => { t.enabled = state.camOn; });
+  }
+
+  document.getElementById('self-video').style.display = state.camOn ? 'block' : 'none';
+  document.getElementById('self-ph').style.display    = state.camOn ? 'none'  : 'flex';
+  document.getElementById('cam-icon').textContent     = state.camOn ? '📷' : '📵';
+  document.getElementById('lbl-cam').textContent      = state.camOn ? 'Stop Cam' : 'Camera';
+  document.getElementById('self-cam-i').textContent   = state.camOn ? '📷' : '📵';
+  document.getElementById('btn-cam').className        = 'ctrl ' + (state.camOn ? 'active' : 'off');
+
+  broadcastState();
+}
+
+/* ══════════════════════════════════════════════════════
+   SPEAKER TOGGLE  (mute/unmute remote audio output)
+   ══════════════════════════════════════════════════════ */
+function toggleAudio() {
+  state.audioOn = !state.audioOn;
+  document.querySelectorAll('.remote-vid').forEach(v => { v.muted = !state.audioOn; });
+  document.getElementById('audio-icon').textContent = state.audioOn ? '🔊' : '🔇';
+  document.getElementById('lbl-audio').textContent  = state.audioOn ? 'Speaker' : 'Muted';
+  document.getElementById('btn-audio').className    = 'ctrl ' + (state.audioOn ? 'active' : 'off');
+}
+
+/* ══════════════════════════════════════════════════════
+   SCREEN SHARE
+
+   FIX 3: When a video sender already exists on the peer
+   connection (camera was on), we replaceTrack() so ICE
+   renegotiation is not required. When NO video sender
+   exists yet (camera was never enabled), we must
+   addTrack() instead — the old code skipped this case
+   entirely, meaning the screen track was never sent.
+   ══════════════════════════════════════════════════════ */
+async function toggleScreen() {
+  if (state.screenOn) { stopScreen(); return; }
+
+  try {
+    state.screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: { ideal: 30 }, width: { ideal: 1920 } },
+      audio: false
+    });
+  } catch (e) {
+    console.warn('[screen] getDisplayMedia cancelled or denied:', e.name);
+    state.screenOn = false;
+    return;
+  }
+
+  state.screenOn = true;
+  const screenTrack = state.screenStream.getVideoTracks()[0];
+
+  // Local preview tile (sharer sees their own screen)
+  let tile = document.getElementById('screen-tile');
+  if (!tile) {
+    tile = document.createElement('div');
+    tile.id = 'screen-tile';
+    tile.className = 'video-tile screen-full';
+    const vid = document.createElement('video');
+    vid.autoplay = true; vid.muted = true; vid.playsInline = true;
+    vid.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000;';
+    const lbl = document.createElement('div');
+    lbl.className = 'tile-label';
+    lbl.textContent = UNAME + ' — Screen';
+    tile.append(vid, lbl);
+    document.getElementById('video-grid').prepend(tile);
+  }
+  tile.querySelector('video').srcObject = state.screenStream;
+
+  // Send screen track to every connected peer
+  peers.forEach(pc => _sendScreenToPeer(pc, screenTrack));
+
+  // Browser's native "Stop sharing" button
+  screenTrack.onended = () => stopScreen();
+
+  document.getElementById('screen-icon').textContent = '🖥️';
+  document.getElementById('lbl-screen').textContent  = 'Stop Share';
+  document.getElementById('btn-screen').classList.add('active');
+  broadcastState();
+}
+
+function stopScreen() {
+  if (!state.screenOn && !state.screenStream) return;
+  state.screenOn = false;
+
+  if (state.screenStream) {
+    state.screenStream.getTracks().forEach(t => t.stop());
+    state.screenStream = null;
+  }
+  document.getElementById('screen-tile')?.remove();
+  document.getElementById('screen-icon').textContent = '🖥️';
+  document.getElementById('lbl-screen').textContent  = 'Share';
+  document.getElementById('btn-screen').classList.remove('active');
+
+  // Restore camera track (or remove video if camera is also off)
+  const camTrack = state.stream?.getVideoTracks()[0] ?? null;
+  peers.forEach(pc => {
+    if (camTrack) {
+      _sendScreenToPeer(pc, camTrack);
+    } else {
+      // No cam track — remove the video sender so remote sees no video
+      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) pc.removeTrack(sender);
+    }
+  });
+
+  broadcastState();
+}
+
+/* ─── Helper: send a specific video track to one peer connection ─── */
+function _sendScreenToPeer(pc, videoTrack) {
+  const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+  if (sender) {
+    // Replace existing video sender — no renegotiation needed
+    sender.replaceTrack(videoTrack).catch(e => console.warn('[rtc] replaceTrack:', e));
+  } else {
+    // FIX 3: No video sender exists yet → addTrack (requires renegotiation)
+    if (state.stream) {
+      pc.addTrack(videoTrack, state.stream);
+    } else {
+      const dummy = new MediaStream([videoTrack]);
+      pc.addTrack(videoTrack, dummy);
+    }
+    // Trigger renegotiation so the remote side receives the new track
+    _renegotiate(pc).catch(e => console.warn('[rtc] renegotiate after addTrack:', e));
+  }
+}
+
+/* ─── Renegotiation: re-offer after addTrack() ─── */
+async function _renegotiate(pc) {
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  // We need the sid for this pc — iterate peers map to find it
+  let targetSid = null;
+  peers.forEach((p, sid) => { if (p === pc) targetSid = sid; });
+  if (targetSid) {
+    socket.emit('offer', { target_sid: targetSid, sdp: pc.localDescription });
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   WEBRTC PEER CONNECTION MANAGEMENT
+   ══════════════════════════════════════════════════════ */
+
+/* Add all local tracks to a peer connection (idempotent — skips
+   tracks that are already represented by an existing sender). */
+function _addLocalTracksToPeer(pc) {
+  if (!state.stream) return;
+  const existingTracks = new Set(pc.getSenders().map(s => s.track));
+  state.stream.getTracks().forEach(track => {
+    if (!existingTracks.has(track)) {
+      pc.addTrack(track, state.stream);
+    }
+  });
+}
+
+async function _createPeer(remoteSid, remoteName, isInitiator) {
+  if (peers.has(remoteSid)) return peers.get(remoteSid);
+
+  const pc = new RTCPeerConnection(RTC_CONFIG);
+  peers.set(remoteSid, pc);
+
+  // FIX 2 (continued): Add local tracks now, at peer-creation time,
+  // so both early joiners (before user has clicked mic/cam) and late
+  // joiners (after) receive tracks correctly. getStream() may return
+  // null here if the user hasn't clicked any media button yet — the
+  // tracks will be added later when getStream() is first called.
+  if (state.stream) _addLocalTracksToPeer(pc);
+
+  // Receive remote tracks
+  pc.ontrack = (event) => {
+    const stream = event.streams[0] || new MediaStream([event.track]);
+    _ensureRemoteTile(remoteSid, remoteName, stream);
+
+    // FIX 4: Track may not be 'live' yet when ontrack fires.
+    // Wire onunmute so visibility updates once the track becomes active.
+    event.track.onunmute = () => _updateRemoteVideoVisibility(remoteSid, stream);
+    _updateRemoteVideoVisibility(remoteSid, stream);
+  };
+
+  // Forward ICE candidates to the signaling server
+  pc.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit('ice_candidate', {
+        target_sid: remoteSid,
+        candidate:  event.candidate
+      });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    console.log(`[${remoteName}] state: ${pc.connectionState}`);
+    if (pc.connectionState === 'failed') {
+      console.warn('[rtc] Restarting ICE for', remoteSid);
+      pc.restartIce();
+    }
+  };
+
+  // FIX 5: onnegotiationneeded fires after addTrack() during screen-
+  // share when a new video sender is added. This ensures the remote
+  // side always receives the updated SDP with the new track.
+  pc.onnegotiationneeded = async () => {
+    if (pc.signalingState !== 'stable') return;
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('offer', { target_sid: remoteSid, sdp: pc.localDescription });
+    } catch (e) {
+      console.warn('[rtc] onnegotiationneeded offer failed:', e);
+    }
+  };
+
+  if (isInitiator) {
+    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+    await pc.setLocalDescription(offer);
+    socket.emit('offer', { target_sid: remoteSid, sdp: pc.localDescription });
+  }
+
+  return pc;
+}
+
+/* ─── Build or update the remote participant's video tile ─── */
+function _ensureRemoteTile(sid, name, stream) {
+  let tile = document.getElementById(`rt-${sid}`);
+  if (!tile) {
+    tile = document.createElement('div');
+    tile.className = 'video-tile';
+    tile.id = `rt-${sid}`;
+
+    const ph = document.createElement('div'); ph.className = 'tile-avatar'; ph.id = `rph-${sid}`;
+    const av = document.createElement('div'); av.className = 'big-avatar-circle';
+    av.textContent = (name || '?')[0].toUpperCase();
+    ph.appendChild(av);
+
+    const vid = document.createElement('video');
+    vid.className = 'remote-vid';
+    vid.id = `rv-${sid}`;
+    vid.autoplay = true; vid.playsInline = true;
+    vid.muted = !state.audioOn;
+    vid.style.cssText = 'width:100%;height:100%;object-fit:cover;display:none;';
+
+    const lbl = document.createElement('div'); lbl.className = 'tile-label';
+    lbl.innerHTML = `<span>${name || 'Participant'}</span>
+      <span style="display:flex;gap:.3rem;">
+        <span id="rtm-${sid}">🔇</span>
+        <span id="rts-${sid}"></span>
+      </span>`;
+
+    tile.append(ph, vid, lbl);
+    document.getElementById('video-grid').appendChild(tile);
+  }
+
+  if (stream) {
+    const vid = document.getElementById(`rv-${sid}`);
+    if (vid && vid.srcObject !== stream) {
+      vid.srcObject = stream;
+      // Re-check visibility whenever a new track is added to the stream
+      stream.onaddtrack = () => _updateRemoteVideoVisibility(sid, stream);
+    }
+    _updateRemoteVideoVisibility(sid, stream);
+  }
+}
+
+function _updateRemoteVideoVisibility(sid, stream) {
+  const vid  = document.getElementById(`rv-${sid}`);
+  const ph   = document.getElementById(`rph-${sid}`);
+  if (!vid || !ph || !stream) return;
+  // A track is considered "active" if it is enabled, live, and not muted
+  const hasVideo = stream.getVideoTracks().some(
+    t => t.enabled && t.readyState === 'live'
+  );
+  vid.style.display = hasVideo ? 'block' : 'none';
+  ph.style.display  = hasVideo ? 'none'  : 'flex';
+}
+
+function _removePeer(sid) {
+  const pc = peers.get(sid);
+  if (pc) { pc.close(); peers.delete(sid); }
+  document.getElementById(`rt-${sid}`)?.remove();
+}
+
+/* ══════════════════════════════════════════════════════
+   SOCKET.IO — SIGNALING
+   ══════════════════════════════════════════════════════ */
+
+const socket = io({ transports: ['websocket', 'polling'] });
+
+socket.on('connect', () => {
+  console.log('[socket] connected:', socket.id);
+  socket.emit('join_meeting', { meeting_id: MID });
+});
+
+/* New joiner receives the list of peers already in the room.
+   They become the CALLER for each existing peer. */
+socket.on('existing_peers', async ({ peers: existingPeers }) => {
+  for (const peer of existingPeers) {
+    if (peer.user_id !== UID) {
+      await _createPeer(peer.sid, peer.name, true /* caller */);
+    }
+  }
+});
+
+/* Someone joins after us — they will send us an offer (they are the caller).
+   We just create a placeholder tile; the peer connection is created when the
+   offer arrives. */
+socket.on('peer_joined', ({ sid, user_id, name }) => {
+  if (user_id !== UID) {
+    _ensureRemoteTile(sid, name, null);
+  }
+});
+
+/* Callee: receive offer → set remote SDP → send answer */
+socket.on('offer', async ({ sdp, from_sid, from_name }) => {
+  let pc = peers.get(from_sid);
+  if (!pc) pc = await _createPeer(from_sid, from_name, false /* callee */);
+
+  // Guard against glare (both sides create offer simultaneously)
+  if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-remote-offer') {
+    console.warn('[rtc] Unexpected signalingState on offer:', pc.signalingState);
+  }
+
+  try {
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit('answer', { target_sid: from_sid, sdp: pc.localDescription });
+  } catch (e) {
+    console.error('[rtc] offer handling failed:', e);
+  }
+});
+
+/* Caller: receive answer → complete handshake */
+socket.on('answer', async ({ sdp, from_sid }) => {
+  const pc = peers.get(from_sid);
+  if (!pc) return;
+  if (pc.signalingState === 'have-local-offer') {
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    } catch (e) {
+      console.error('[rtc] answer handling failed:', e);
+    }
+  }
+});
+
+/* ICE candidate exchange */
+socket.on('ice_candidate', async ({ candidate, from_sid }) => {
+  const pc = peers.get(from_sid);
+  if (pc && candidate) {
+    try {
+      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (e) {
+      // Benign in many cases (e.g., candidate arrives before remote desc)
+      console.warn('[rtc] addIceCandidate:', e.message);
+    }
+  }
+});
+
+/* Peer disconnected — remove their tile */
+socket.on('peer_left', ({ sid }) => {
+  _removePeer(sid);
+});
+
+/* Remote mic/cam/screen state update */
+socket.on('peer_media_state', ({ sid, user_id, mic, cam, screen, name }) => {
+  // Update participant panel icons
+  const panelMic = document.getElementById(`pm-${user_id}`);
+  const panelCam = document.getElementById(`pc-${user_id}`);
+  if (panelMic) { panelMic.textContent = mic ? '🎤' : '🔇'; panelMic.style.opacity = mic ? '1' : '.4'; }
+  if (panelCam) { panelCam.textContent = cam ? '📷' : '📵'; panelCam.style.opacity = cam ? '1' : '.4'; }
+
+  // Update tile-level icons
+  const tileMic = document.getElementById(`rtm-${sid}`);
+  const tileScr = document.getElementById(`rts-${sid}`);
+  if (tileMic) { tileMic.textContent = mic ? '🎤' : '🔇'; }
+  if (tileScr) tileScr.textContent = screen ? '🖥️' : '';
+
+  // If remote is sharing screen, expand their tile to full width
+  const tile = document.getElementById(`rt-${sid}`);
+  if (tile) {
+    tile.classList.toggle('screen-full', screen);
+  }
+});
+
+socket.on('disconnect', () => {
+  console.log('[socket] disconnected');
+});
+
+/* Broadcast local mic/cam/screen state to all peers in the room */
+function broadcastState() {
+  socket.emit('media_state', {
+    meeting_id: MID,
+    mic:    state.micOn,
+    cam:    state.camOn,
+    screen: state.screenOn
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   VOICE ACTIVITY DETECTION  (speaking border glow)
+   ══════════════════════════════════════════════════════ */
+function _startVAD() {
+  if (!state.stream || state.vadCtx) return;
+  try {
+    state.vadCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = state.vadCtx.createAnalyser();
+    state.vadCtx.createMediaStreamSource(state.stream).connect(analyser);
+    analyser.fftSize = 256;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const tile = document.getElementById('self-tile');
+    function loop() {
+      analyser.getByteFrequencyData(data);
+      const vol = data.reduce((a, b) => a + b, 0) / data.length;
+      tile.classList.toggle('speaking', vol > 15);
+      if (state.micOn) state.vadLoop = requestAnimationFrame(loop);
+      else tile.classList.remove('speaking');
+    }
+    state.vadLoop = requestAnimationFrame(loop);
+  } catch (e) {
+    console.warn('[vad] AudioContext unavailable:', e);
+  }
+}
+
+function _stopVAD() {
+  if (state.vadLoop) cancelAnimationFrame(state.vadLoop);
+  if (state.vadCtx) { state.vadCtx.close().catch(() => {}); state.vadCtx = null; }
+  document.getElementById('self-tile')?.classList.remove('speaking');
+}
+
+/* ══════════════════════════════════════════════════════
+   UI HELPERS
+   ══════════════════════════════════════════════════════ */
+let _panelOpen = false;
+function togglePanel() { _panelOpen = !_panelOpen; document.getElementById('side-panel').style.display = _panelOpen ? 'flex' : 'none'; }
+function closePanel()  { _panelOpen = false; document.getElementById('side-panel').style.display = 'none'; }
+
+function cleanup() {
+  _stopVAD();
+  stopScreen();
+  socket.disconnect();
+  peers.forEach(pc => pc.close());
+  peers.clear();
+  if (state.stream) state.stream.getTracks().forEach(t => t.stop());
+}
+window.addEventListener('beforeunload', cleanup);
+</script>
+{% endblock %}

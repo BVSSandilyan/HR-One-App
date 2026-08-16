@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Mark Attendance - HR ONEAPP{% endblock %}
+{% block page_title %}Mark Attendance — {{ today.strftime('%d %b %Y') }}{% endblock %}
+{% block content %}
+<div class="card">
+  <form method="POST">
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Employee</th><th>Code</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for emp, user in employees %}
+    <tr>
+      <td>{{ user.name }}</td>
+      <td>{{ emp.employee_code }}</td>
+      <td>
+        <select name="status_{{ emp.id }}">
+          <option value="present">Present</option>
+          <option value="absent">Absent</option>
+          <option value="half-day">Half Day</option>
+          <option value="leave">Leave</option>
+        </select>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3" class="empty-state">No employees found.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <button type="submit" class="btn btn-primary" style="margin-top:1rem;">Save Attendance</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Registration Requests - HR ONEAPP{% endblock %}
+{% block page_title %}Registration Requests{% endblock %}
+{% block breadcrumb %}<p class="crumb">Review and manage new account requests</p>{% endblock %}
+
+{% block content %}
+
+<!-- ── PENDING (needs action) ── -->
+<div class="card" style="margin-bottom:1.5rem;">
+  <div class="card-header">
+    <div>
+      <h3>⏳ Pending Approval</h3>
+      <p class="subtitle">{{ pending|length }} request(s) awaiting your decision</p>
+    </div>
+  </div>
+  {% if pending %}
+  <div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr><th>Name</th><th>Email</th><th>Role</th><th>Registered</th><th>Status</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+    {% for u in pending %}
+    <tr>
+      <td><strong>{{ u.name }}</strong></td>
+      <td>{{ u.email }}</td>
+      <td><span class="badge-pill {{ 'badge-blue' if u.role=='hr' else 'badge-gray' }}">{{ u.role|capitalize }}</span></td>
+      <td>{{ u.created_at.strftime('%d %b %Y %H:%M') }}</td>
+      <td><span class="badge-pill badge-orange">Pending</span></td>
+      <td style="display:flex;gap:.5rem;flex-wrap:wrap;">
+        <a href="{{ url_for('admin_approval.registration_detail', user_id=u.id) }}" class="btn btn-sm btn-outline">👁 View</a>
+        <button class="btn btn-sm btn-success"
+                onclick="confirmApprove({{ u.id }}, '{{ u.name }}')">✓ Approve</button>
+        <button class="btn btn-sm btn-danger"
+                onclick="showRejectModal({{ u.id }}, '{{ u.name }}')">✕ Reject</button>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">No pending registration requests 🎉</p>
+  {% endif %}
+</div>
+
+<!-- ── RECENTLY APPROVED ── -->
+{% if approved %}
+<div class="card" style="margin-bottom:1.5rem;">
+  <div class="card-header"><h3>✅ Recently Approved</h3><p class="subtitle">Last 20 approved accounts</p></div>
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Registered</th><th>Approved</th></tr></thead>
+    <tbody>
+    {% for u in approved %}
+    <tr>
+      <td>{{ u.name }}</td>
+      <td>{{ u.email }}</td>
+      <td><span class="badge-pill {{ 'badge-blue' if u.role=='hr' else 'badge-gray' }}">{{ u.role|capitalize }}</span></td>
+      <td>{{ u.created_at.strftime('%d %b %Y') }}</td>
+      <td><span class="badge-pill badge-green">{{ u.approved_at.strftime('%d %b %Y') if u.approved_at else '—' }}</span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── REJECTED ── -->
+{% if rejected %}
+<div class="card">
+  <div class="card-header"><h3>❌ Rejected</h3><p class="subtitle">Last 20 rejected requests</p></div>
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Registered</th><th>Reason</th></tr></thead>
+    <tbody>
+    {% for u in rejected %}
+    <tr>
+      <td>{{ u.name }}</td>
+      <td>{{ u.email }}</td>
+      <td><span class="badge-pill badge-gray">{{ u.role|capitalize }}</span></td>
+      <td>{{ u.created_at.strftime('%d %b %Y') }}</td>
+      <td style="color:var(--text-muted);font-size:.85rem;">{{ u.rejection_reason or '—' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── APPROVE CONFIRM FORM (hidden, submitted programmatically) ── -->
+<form id="approve-form" method="POST" action="" style="display:none;"></form>
+
+<!-- ── REJECT MODAL ── -->
+<div id="reject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;
+     display:none;align-items:center;justify-content:center;" onclick="closeRejectModal(event)">
+  <div style="background:var(--surface);border-radius:14px;padding:2rem;max-width:440px;width:90%;
+              box-shadow:var(--shadow-lg);" onclick="event.stopPropagation()">
+    <h3 style="margin-bottom:.5rem;">Reject Registration</h3>
+    <p id="reject-modal-name" style="color:var(--text-muted);font-size:.9rem;margin-bottom:1rem;"></p>
+    <form id="reject-form" method="POST" action="">
+      <div class="form-group">
+        <label>Rejection Reason <span style="color:var(--text-faint);font-size:.8rem;">(optional — shown to applicant)</span></label>
+        <textarea name="reason" rows="3" placeholder="e.g. Position not currently available, incomplete information…"
+                  style="width:100%;resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex;gap:.75rem;margin-top:1rem;">
+        <button type="submit" class="btn btn-danger">Confirm Reject</button>
+        <button type="button" class="btn btn-outline" onclick="closeRejectModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmApprove(userId, userName) {
+  if (confirm(`Approve ${userName}'s account?\n\nThey will be notified and can log in immediately after approval.`)) {
+    const form = document.getElementById('approve-form');
+    form.action = `/admin/registrations/${userId}/approve`;
+    form.submit();
+  }
+}
+
+function showRejectModal(userId, userName) {
+  document.getElementById('reject-modal-name').textContent =
+    `Rejecting registration for: ${userName}`;
+  document.getElementById('reject-form').action =
+    `/admin/registrations/${userId}/reject`;
+  const modal = document.getElementById('reject-modal');
+  modal.style.display = 'flex';
+}
+
+function closeRejectModal(e) {
+  if (!e || e.target === document.getElementById('reject-modal')) {
+    document.getElementById('reject-modal').style.display = 'none';
+  }
+}
+</script>
+{% endblock %}

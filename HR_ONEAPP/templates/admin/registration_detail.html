@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Registration Detail - HR ONEAPP{% endblock %}
+{% block page_title %}Registration Detail{% endblock %}
+{% block breadcrumb %}
+<p class="crumb">
+  <a href="{{ url_for('admin_approval.registrations') }}" style="color:var(--accent);">Registration Requests</a>
+  › {{ user.name }}
+</p>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:600px;">
+  <div style="display:flex;align-items:center;gap:1.25rem;margin-bottom:1.75rem;">
+    <div class="big-avatar">{{ user.name[0]|upper }}</div>
+    <div>
+      <h2 style="margin-bottom:.2rem;">{{ user.name }}</h2>
+      <span class="badge-pill {{ 'badge-orange' if user.approval_status=='pending' else ('badge-green' if user.approval_status=='approved' else 'badge-red') }}">
+        {{ user.approval_status|capitalize }}
+      </span>
+      <span class="badge-pill {{ 'badge-blue' if user.role=='hr' else 'badge-gray' }}" style="margin-left:.35rem;">
+        {{ user.role|capitalize }}
+      </span>
+    </div>
+  </div>
+
+  <div class="detail-grid" style="margin-bottom:1.5rem;">
+    <div><label>Email</label><p>{{ user.email }}</p></div>
+    <div><label>Role Requested</label><p>{{ user.role|capitalize }}</p></div>
+    <div><label>Registration Date</label><p>{{ user.created_at.strftime('%d %b %Y %H:%M') }}</p></div>
+    <div><label>Approval Status</label><p>{{ user.approval_status|capitalize }}</p></div>
+    {% if user.approved_at %}
+    <div><label>Decision Date</label><p>{{ user.approved_at.strftime('%d %b %Y %H:%M') }}</p></div>
+    {% endif %}
+    {% if user.rejection_reason %}
+    <div style="grid-column:1/-1;"><label>Rejection Reason</label><p>{{ user.rejection_reason }}</p></div>
+    {% endif %}
+  </div>
+
+  <!-- Only show action buttons if the request is still pending -->
+  {% if user.approval_status == 'pending' %}
+  <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+    <button class="btn btn-success"
+            onclick="confirmApprove({{ user.id }}, '{{ user.name }}')">✓ Approve Account</button>
+    <button class="btn btn-danger"
+            onclick="showRejectModal({{ user.id }}, '{{ user.name }}')">✕ Reject Registration</button>
+    <a href="{{ url_for('admin_approval.registrations') }}" class="btn btn-outline">← Back</a>
+  </div>
+  {% else %}
+  <a href="{{ url_for('admin_approval.registrations') }}" class="btn btn-outline">← Back to Requests</a>
+  {% endif %}
+</div>
+
+<!-- Reuse the same approve/reject modals from registrations.html -->
+<form id="approve-form" method="POST" action="" style="display:none;"></form>
+
+<div id="reject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;
+     align-items:center;justify-content:center;" onclick="closeRejectModal(event)">
+  <div style="background:var(--surface);border-radius:14px;padding:2rem;max-width:440px;width:90%;
+              box-shadow:var(--shadow-lg);" onclick="event.stopPropagation()">
+    <h3 style="margin-bottom:.5rem;">Reject Registration</h3>
+    <p id="reject-modal-name" style="color:var(--text-muted);font-size:.9rem;margin-bottom:1rem;"></p>
+    <form id="reject-form" method="POST" action="">
+      <div class="form-group">
+        <label>Rejection Reason <span style="color:var(--text-faint);font-size:.8rem;">(optional)</span></label>
+        <textarea name="reason" rows="3" placeholder="e.g. Position not available…"
+                  style="width:100%;resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex;gap:.75rem;margin-top:1rem;">
+        <button type="submit" class="btn btn-danger">Confirm Reject</button>
+        <button type="button" class="btn btn-outline" onclick="closeRejectModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmApprove(userId, userName) {
+  if (confirm(`Approve ${userName}'s account?\n\nThey will be notified and can log in immediately.`)) {
+    const form = document.getElementById('approve-form');
+    form.action = `/admin/registrations/${userId}/approve`;
+    form.submit();
+  }
+}
+function showRejectModal(userId, userName) {
+  document.getElementById('reject-modal-name').textContent =
+    `Rejecting registration for: ${userName}`;
+  document.getElementById('reject-form').action =
+    `/admin/registrations/${userId}/reject`;
+  const modal = document.getElementById('reject-modal');
+  modal.style.display = 'flex';
+}
+function closeRejectModal(e) {
+  if (!e || e.target === document.getElementById('reject-modal')) {
+    document.getElementById('reject-modal').style.display = 'none';
+  }
+}
+</script>
+{% endblock %}

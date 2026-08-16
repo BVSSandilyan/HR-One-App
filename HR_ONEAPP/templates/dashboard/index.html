@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - HR ONEAPP{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block breadcrumb %}<p class="crumb">Overview of your workspace</p>{% endblock %}
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-card blue"><div class="stat-icon">👥</div>
+    <div><p class="stat-num">{{ total_employees }}</p><p class="stat-label">Total Employees</p></div></div>
+  <div class="stat-card green"><div class="stat-icon">👤</div>
+    <div><p class="stat-num">{{ total_users }}</p><p class="stat-label">Total Users</p></div></div>
+  {% if role == 'admin' %}
+  <a href="{{ url_for('leave.index') }}" class="stat-card orange" style="text-decoration:none;cursor:pointer;">
+  {% else %}
+  <div class="stat-card orange">
+  {% endif %}
+    <div class="stat-icon">📅</div>
+    <div><p class="stat-num">{{ pending_leaves }}</p><p class="stat-label">{{ 'Pending Leaves' if role == 'admin' else 'My Pending Leaves' }}</p></div>
+  {% if role == 'admin' %}</a>{% else %}</div>{% endif %}
+  <div class="stat-card purple"><div class="stat-icon">📹</div>
+    <div><p class="stat-num">{{ active_meetings }}</p><p class="stat-label">Active Meetings</p></div></div>
+  {% if leave_balance is not none %}
+  <a href="{{ url_for('leave.apply') }}" class="stat-card teal" style="text-decoration:none;cursor:pointer;">
+    <div class="stat-icon">🗓</div>
+    <div><p class="stat-num">{{ '%.1f'|format(leave_balance) }}</p><p class="stat-label">Leave Balance (of 20)</p></div>
+  </a>
+  {% endif %}
+</div>
+
+{% if active_meetings > 0 %}
+<div class="meeting-alert-banner">
+  🔴 There is an active meeting right now!
+  <a href="{{ url_for('meeting.list_meetings') }}" class="btn btn-sm btn-white">Join Now</a>
+</div>
+{% endif %}
+
+<div class="two-col">
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <div><h3>My Tasks</h3><p class="subtitle">Items needing your attention</p></div>
+        {% if role == 'admin' %}<a href="{{ url_for('task.assign') }}" class="btn btn-sm btn-primary">+ Assign Task</a>{% endif %}
+      </div>
+      {% if my_tasks %}
+      <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Title</th><th>Priority</th><th>Due</th><th>Update</th></tr></thead>
+        <tbody>
+        {% for t in my_tasks %}
+        <tr>
+          <td>{{ t.title }}</td>
+          <td><span class="badge-pill badge-{{ t.priority }}">{{ t.priority }}</span></td>
+          <td>{{ t.due_date or '—' }}</td>
+          <td>
+            <form method="POST" action="{{ url_for('task.update_status', task_id=t.id) }}" style="display:inline">
+              <select name="status" onchange="this.form.submit()" style="font-size:.78rem;padding:3px 6px;">
+                <option {% if t.status=='pending' %}selected{% endif %} value="pending">Pending</option>
+                <option {% if t.status=='in-progress' %}selected{% endif %} value="in-progress">In Progress</option>
+                <option {% if t.status=='completed' %}selected{% endif %} value="completed">Completed</option>
+              </select>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}<p class="empty-state">No pending tasks 🎉</p>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>Quick Actions</h3></div>
+      <div class="quick-actions">
+        {% if role == 'admin' %}
+        <a href="{{ url_for('meeting.start') }}" class="qa-btn qa-red">📹 Start Meeting</a>
+        <a href="{{ url_for('attendance.mark') }}" class="qa-btn qa-blue">✅ Mark Attendance</a>
+        <a href="{{ url_for('payroll.assign') }}" class="qa-btn qa-green">💰 Assign Salary</a>
+        <a href="{{ url_for('task.assign') }}" class="qa-btn qa-orange">📋 Assign Task</a>
+        <a href="{{ url_for('leave.index') }}" class="qa-btn qa-purple">🗓 Review Leave Requests</a>
+        {% elif role == 'hr' %}
+        <a href="{{ url_for('employee.index') }}" class="qa-btn qa-blue">👥 View Employees</a>
+        <a href="{{ url_for('task.index') }}" class="qa-btn qa-orange">📋 My Tasks</a>
+        <a href="{{ url_for('meeting.list_meetings') }}" class="qa-btn qa-purple">📹 Meetings</a>
+        <a href="{{ url_for('leave.apply') }}" class="qa-btn qa-green">🗓 Apply for Leave</a>
+        {% else %}
+        <a href="{{ url_for('task.index') }}" class="qa-btn qa-orange">📋 My Tasks</a>
+        <a href="{{ url_for('meeting.list_meetings') }}" class="qa-btn qa-purple">📹 Meetings</a>
+        <a href="{{ url_for('leave.apply') }}" class="qa-btn qa-green">🗓 Apply for Leave</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if role == 'admin' and pending_registrations %}
+    <div class="card" style="border-left:4px solid var(--warning);">
+      <div class="card-header">
+        <div>
+          <h3>🆕 Registration Requests
+            <span class="badge" style="background:var(--warning);color:#fff;border-radius:12px;
+                  padding:2px 8px;font-size:.72rem;margin-left:.4rem;">{{ pending_reg_count }}</span>
+          </h3>
+          <p class="subtitle">Pending Admin approval</p>
+        </div>
+        <a href="{{ url_for('admin_approval.registrations') }}" class="btn btn-sm btn-outline">View All</a>
+      </div>
+      <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Name</th><th>Role</th><th>Registered</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for u in pending_registrations[:5] %}
+        <tr>
+          <td><strong>{{ u.name }}</strong><br/><small style="color:var(--text-faint);">{{ u.email }}</small></td>
+          <td><span class="badge-pill {{ 'badge-blue' if u.role=='hr' else 'badge-gray' }}">{{ u.role|capitalize }}</span></td>
+          <td>{{ u.created_at.strftime('%d %b %Y') }}</td>
+          <td><a href="{{ url_for('admin_approval.registration_detail', user_id=u.id) }}" class="btn btn-sm btn-outline">👁 View</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% if pending_reg_count > 5 %}
+      <p style="text-align:center;margin-top:.75rem;font-size:.85rem;color:var(--text-muted);">
+        +{{ pending_reg_count - 5 }} more —
+        <a href="{{ url_for('admin_approval.registrations') }}" style="color:var(--accent);">see all</a>
+      </p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if role == 'admin' %}
+    <div class="card" id="salary-widget">
+      <div class="card-header">
+        <div><h3>💰 Assign Salary by Leave Usage</h3>
+          <p class="subtitle">Pulls approved leave days for the month automatically — full salary if within the {{ "%.2f"|format(20/12) }}/month allowance, otherwise enter a deduction rate for the excess.</p>
+        </div>
+      </div>
+      <form method="POST" action="{{ url_for('dashboard.salary_assign') }}" id="salary-form">
+        <div class="form-group">
+          <label>Employee / HR *</label>
+          <select name="employee_id" id="sw-employee" required onchange="swPreview()">
+            <option value="">-- Select --</option>
+            {% for emp, user in salary_widget_employees %}
+            <option value="{{ emp.id }}">{{ user.name }} ({{ user.role | capitalize }}) — {{ emp.employee_code }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="form-group">
+            <label>Month *</label>
+            <select name="month" id="sw-month" required onchange="swPreview()">
+              {% for m in range(1,13) %}
+              <option value="{{ m }}" {{ 'selected' if m == current_month }}>{{ m }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Year *</label>
+            <input type="number" name="year" id="sw-year" value="{{ current_year }}" required onchange="swPreview()"/>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="form-group">
+            <label>Basic Salary (₹) *</label>
+            <input type="number" name="basic_salary" id="sw-basic" step="0.01" required placeholder="0.00" onchange="swPreview()"/>
+          </div>
+          <div class="form-group">
+            <label>Allowances (₹)</label>
+            <input type="number" name="allowances" id="sw-allowances" step="0.01" placeholder="0.00" onchange="swPreview()"/>
+          </div>
+        </div>
+
+        <div id="sw-preview" style="display:none;"></div>
+
+        <div class="form-group" id="sw-rate-group" style="display:none;">
+          <label>Deduction Rate (₹200–500 / excess day) *</label>
+          <input type="number" name="deduction_rate" id="sw-rate" min="200" max="500" step="1" placeholder="e.g. 350"/>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="sw-submit" disabled>Select an employee to continue</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="cal-wrap" id="overview-cal"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  initCalendar('overview-cal', '{{ url_for("dashboard.calendar_overview") }}', {title: 'My Calendar'});
+
+  {% if role == 'admin' %}
+  let swDebounce = null;
+  function swPreview(){
+    clearTimeout(swDebounce);
+    swDebounce = setTimeout(swPreviewNow, 300);
+  }
+
+  async function swPreviewNow(){
+    const empId = document.getElementById('sw-employee').value;
+    const month = document.getElementById('sw-month').value;
+    const year  = document.getElementById('sw-year').value;
+    const basic = document.getElementById('sw-basic').value;
+    const allowances = document.getElementById('sw-allowances').value || 0;
+    const previewBox = document.getElementById('sw-preview');
+    const rateGroup   = document.getElementById('sw-rate-group');
+    const submitBtn   = document.getElementById('sw-submit');
+
+    if (!empId || !month || !year || !basic){
+      previewBox.style.display = 'none';
+      rateGroup.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Select an employee to continue';
+      return;
+    }
+
+    try {
+      const res = await fetch('{{ url_for("dashboard.salary_preview") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `employee_id=${empId}&month=${month}&year=${year}&basic_salary=${basic}&allowances=${allowances}`
+      });
+      const data = await res.json();
+      if (data.error){ previewBox.style.display = 'none'; return; }
+
+      previewBox.style.display = 'block';
+      if (data.needs_rate){
+        previewBox.innerHTML = `<div class="info-box" style="border-color:var(--danger);background:#fef2f2;color:var(--danger);">
+          ⚠️ ${data.days_used} leave day(s) used this month — ${data.excess_days} day(s) over the
+          ${data.monthly_allowance}/month allowance. Enter a rate below to deduct the excess; full salary
+          (₹${data.full_salary}) cannot be assigned without it.
+        </div>`;
+        rateGroup.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Assign Salary (with deduction)';
+      } else {
+        previewBox.innerHTML = `<div class="info-box" style="border-color:var(--success);background:#f0fdf4;color:var(--success);">
+          ✅ ${data.days_used} leave day(s) used this month — within the ${data.monthly_allowance}/month
+          allowance. Full salary of ₹${data.full_salary} will be assigned, no deduction.
+        </div>`;
+        rateGroup.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.textContent = `Assign Full Salary (₹${data.full_salary})`;
+      }
+    } catch (e){
+      previewBox.style.display = 'none';
+    }
+  }
+  {% endif %}
+</script>
+{% endblock %}

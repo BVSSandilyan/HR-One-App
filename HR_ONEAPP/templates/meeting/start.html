@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Start Meeting - HR ONEAPP{% endblock %}
+{% block page_title %}Start Meeting{% endblock %}
+{% block content %}
+<div class="card" style="max-width:600px;">
+  <h3 style="margin-bottom:1.5rem;">📹 Start a New Meeting</h3>
+  <form method="POST">
+    <div class="form-group"><label>Meeting Title *</label>
+      <input type="text" name="title" required placeholder="e.g. Weekly Standup"/></div>
+    <div class="form-group"><label>Description</label>
+      <textarea name="description" rows="3" placeholder="What is this meeting about?"></textarea></div>
+    <div class="form-group"><label>Meeting Link (optional)</label>
+      <input type="url" name="meeting_link" placeholder="https://meet.google.com/..."/></div>
+
+    <div class="form-group">
+      <label>Date *</label>
+      <input type="date" name="scheduled_date" id="meeting-date" required
+             min="{{ today }}" value="{{ today }}" onchange="onMeetingDateChange()"/>
+      <p style="font-size:.78rem;color:var(--text-faint);margin-top:.3rem;">
+        Today starts the meeting immediately. A future date fixes it for that day — it will go live
+        and notify everyone automatically, with no further action needed from you.
+      </p>
+    </div>
+
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:600;">
+        <input type="checkbox" name="is_recurring" id="recur-check" style="width:auto;" onchange="document.getElementById('recur-opts').style.display=this.checked?'block':'none'"/>
+        Recurring meeting
+      </label>
+    </div>
+    <div id="recur-opts" style="display:none;margin-bottom:1rem;">
+      <div class="form-group"><label>Recurrence</label>
+        <select name="recurrence">
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="info-box" id="meeting-info-box">ℹ️ Starting this meeting will send an <strong>instant alert notification</strong> to all employees and HR.</div>
+    <div style="display:flex;gap:1rem;margin-top:1.5rem;">
+      <button type="submit" class="btn btn-primary" id="meeting-submit-btn">🚀 Start &amp; Notify All</button>
+      <a href="{{ url_for('meeting.list_meetings') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  function onMeetingDateChange(){
+    const picked = document.getElementById('meeting-date').value;
+    const today  = "{{ today }}";
+    const isFuture = picked > today;
+    const box = document.getElementById('meeting-info-box');
+    const btn = document.getElementById('meeting-submit-btn');
+    if (isFuture){
+      box.innerHTML = 'ℹ️ This meeting is <strong>fixed for ' + picked + '</strong>. ' +
+        'No notification goes out now — everyone will be alerted automatically the moment that date arrives.';
+      btn.innerHTML = '🗓 Schedule for ' + picked;
+    } else {
+      box.innerHTML = 'ℹ️ Starting this meeting will send an <strong>instant alert notification</strong> to all employees and HR.';
+      btn.innerHTML = '🚀 Start &amp; Notify All';
+    }
+  }
+</script>
+{% endblock %}

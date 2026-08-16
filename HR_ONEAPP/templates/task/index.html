@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Tasks - HR ONEAPP{% endblock %}
+{% block page_title %}Tasks{% endblock %}
+{% block breadcrumb %}<p class="crumb">Deadlines and milestones</p>{% endblock %}
+{% block content %}
+<div class="two-col">
+  <div>
+    {% if role == 'admin' %}
+    <div style="margin-bottom:1rem;"><a href="{{ url_for('task.assign') }}" class="btn btn-primary">+ Assign Task</a></div>
+    {% endif %}
+    <div class="card">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Title</th><th>Assigned To</th><th>Priority</th><th>Due Date</th><th>Status</th><th>Update</th></tr></thead>
+      <tbody>
+      {% for t in tasks %}
+      <tr>
+        <td><strong>{{ t.title }}</strong><br/><small style="color:var(--text-faint);">{{ t.description or '' }}</small></td>
+        <td>{{ t.assignee.name }}</td>
+        <td><span class="badge-pill badge-{{ t.priority }}">{{ t.priority }}</span></td>
+        <td>{% if t.is_overdue %}<span style="color:var(--danger);font-weight:700;">{{ t.due_date }} (overdue)</span>{% else %}{{ t.due_date or '—' }}{% endif %}</td>
+        <td><span class="badge-pill {{ 'badge-green' if t.status=='completed' else ('badge-blue' if t.status=='in-progress' else 'badge-orange') }}">{{ t.status }}</span></td>
+        <td>
+          <form method="POST" action="{{ url_for('task.update_status', task_id=t.id) }}">
+            <select name="status" onchange="this.form.submit()">
+              <option {% if t.status=='pending' %}selected{% endif %} value="pending">Pending</option>
+              <option {% if t.status=='in-progress' %}selected{% endif %} value="in-progress">In Progress</option>
+              <option {% if t.status=='completed' %}selected{% endif %} value="completed">Completed</option>
+            </select>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty-state">No tasks found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% include "_pagination.html" %}
+    </div>
+  </div>
+
+  <div class="cal-wrap" id="task-cal"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  initCalendar('task-cal', '{{ url_for("task.calendar_feed") }}', {title: 'Task Calendar'});
+</script>
+{% endblock %}

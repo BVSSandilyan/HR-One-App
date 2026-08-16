@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Employees - HR ONEAPP{% endblock %}
+{% block page_title %}Employees{% endblock %}
+{% block breadcrumb %}<p class="crumb">Directory and milestones</p>{% endblock %}
+{% block content %}
+<div class="two-col">
+  <div class="card">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Code</th><th>Role</th><th>Designation</th><th>Salary</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for emp, user in employees %}
+      <tr>
+        <td><strong>{{ user.name }}</strong><br/><small style="color:var(--text-faint);">{{ user.email }}</small></td>
+        <td>{{ emp.employee_code }}</td>
+        <td><span class="badge-pill {{ 'badge-red' if user.role=='admin' else ('badge-blue' if user.role=='hr' else 'badge-gray') }}">{{ user.role | capitalize }}</span></td>
+        <td>{{ emp.designation or '—' }}</td>
+        <td>{% if emp.salary %}₹{{ '%.2f'|format(emp.salary) }}{% else %}—{% endif %}</td>
+        <td>
+          <a href="{{ url_for('employee.detail', emp_id=emp.id) }}" class="btn btn-sm btn-outline">View</a>
+          {% if session.user_role in ['admin','hr'] %}<a href="{{ url_for('employee.edit', emp_id=emp.id) }}" class="btn btn-sm btn-primary">Edit</a>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty-state">No employees found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% include "_pagination.html" %}
+  </div>
+
+  <div class="cal-wrap" id="employee-cal"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  initCalendar('employee-cal', '{{ url_for("employee.calendar_feed") }}', {title: 'Team Calendar'});
+</script>
+{% endblock %}

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}HR ONEAPP{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+  <script>
+    (function(){ try{
+      var t = sessionStorage.getItem('hr_theme') || 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    }catch(e){} })();
+    window.HR_USER_ROLE = "{{ session.user_role or '' }}";
+  </script>
+</head>
+<body>
+{% if session.user_id and not force_auth_layout %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">
+      <span class="logo-badge">HR</span>
+      <span class="logo-text">HR ONE<span>APP</span></span>
+    </div>
+    <nav>
+      <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if request.endpoint=='dashboard.index' }}">
+        <span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="{{ url_for('employee.index') }}" class="{{ 'active' if 'employee' in request.endpoint }}">
+        <span class="nav-icon">👥</span> Employees</a>
+      <a href="{{ url_for('meeting.list_meetings') }}" class="{{ 'active' if 'meeting' in request.endpoint }}">
+        <span class="nav-icon">📹</span> Meetings</a>
+      <a href="{{ url_for('task.index') }}" class="{{ 'active' if 'task' in request.endpoint }}">
+        <span class="nav-icon">📋</span> Tasks</a>
+      <a href="{{ url_for('leave.index') }}" class="{{ 'active' if 'leave' in request.endpoint }}">
+        <span class="nav-icon">🗓</span> Leave Requests</a>
+      {% if session.user_role == 'admin' %}
+      <a href="{{ url_for('attendance.index') }}" class="{{ 'active' if 'attendance' in request.endpoint }}">
+        <span class="nav-icon">✅</span> Attendance</a>
+      <a href="{{ url_for('payroll.index') }}" class="{{ 'active' if 'payroll' in request.endpoint }}">
+        <span class="nav-icon">💰</span> Payroll</a>
+      <a href="{{ url_for('admin_approval.registrations') }}" class="{{ 'active' if 'admin_approval' in request.endpoint }}">
+        <span class="nav-icon">🆕</span> Registrations</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <span class="avatar">{{ session.user_name[0] | upper }}</span>
+        <div>
+          <p class="uname">{{ session.user_name }}</p>
+          <p class="urole">{{ session.user_role | capitalize }}</p>
+        </div>
+      </div>
+      <a href="{{ url_for('auth.logout') }}" class="logout-btn">🚪 Logout</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;">
+        <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+        <div>
+          <h2>{% block page_title %}{% endblock %}</h2>
+          {% block breadcrumb %}{% endblock %}
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" onclick="toggleTheme()" title="Toggle dark mode">
+          <span id="theme-icon">🌙</span>
+        </button>
+        <div class="notif-area">
+          <button class="icon-btn" onclick="toggleNotifs()" title="Notifications">
+            🔔 <span class="badge" id="notif-count" style="display:none;">0</span>
+          </button>
+          <div class="notif-dropdown" id="notif-dropdown" style="display:none;">
+            <p class="notif-header">Notifications</p>
+            <div id="notif-list"><p style="padding:1rem;color:var(--text-faint);">Loading...</p></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="flash-area">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }}">{{ msg }} <span onclick="this.parentElement.remove()">✕</span></div>
+      {% endfor %}
+    {% endwith %}
+    </div>
+
+    <div class="content fade-in">{% block content %}{% endblock %}</div>
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/calendar.js') }}"></script>
+{% block scripts %}{% endblock %}
+{% else %}
+  {% block auth_content %}{% endblock %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="auth-alert alert-{{ cat }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+{% endif %}
+</body>
+</html>
